@@ -1,3 +1,4 @@
+console.log("hello")
 (function () {
     var myConnector = tableau.makeConnector();
 
@@ -50,3 +51,6 @@
 
     tableau.registerConnector(myConnector);
 })();
+
+
+document.querySelector("#getData")
