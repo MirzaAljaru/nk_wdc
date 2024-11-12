@@ -1,4 +1,5 @@
 console.log("hello")
+
 (function () {
     var myConnector = tableau.makeConnector();
 
