@@ -3,3 +3,4 @@ requests
 pandas
 tableauhyperapi
 tableauserverclient
+xlsxwriter
