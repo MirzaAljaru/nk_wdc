@@ -4,3 +4,4 @@ pandas
 tableauhyperapi
 tableauserverclient
 xlsxwriter
+openpyxl
