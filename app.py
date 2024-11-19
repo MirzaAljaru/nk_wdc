@@ -56,79 +56,80 @@ def get_xlsx():
 
         # Initialize pagination variables
         start_position = 1
-        limit = 10000
+        limit = 1000  # Fetch smaller batches to reduce memory usage
         total_records_fetched = 0
-        combined_data = []
 
-        while True:
-            # Update the API URL with pagination parameters
-            params = {
-                "appId": app_id,
-                "lang": "E",
-                "statsDataId": stats_data_id,
-                "metaGetFlg": "Y",
-                "cntGetFlg": "N",
-                "explanationGetFlg": "Y",
-                "annotationGetFlg": "Y",
-                "sectionHeaderFlg": "1",
-                "replaceSpChars": "0",
-                "startPosition": start_position,
-                "limit": limit
-            }
+        # Temporary CSV file to store data
+        output_csv_file = f"/tmp/{stats_data_id}.csv"  # Use `/tmp` directory for Render
 
-            # Make a GET request to the API
-            response = requests.get(api_url, params=params)
-            response.raise_for_status()
+        with open(output_csv_file, "w", encoding="utf-8") as csv_file:
+            while True:
+                # Update the API URL with pagination parameters
+                params = {
+                    "appId": app_id,
+                    "lang": "E",
+                    "statsDataId": stats_data_id,
+                    "metaGetFlg": "Y",
+                    "cntGetFlg": "N",
+                    "explanationGetFlg": "Y",
+                    "annotationGetFlg": "Y",
+                    "sectionHeaderFlg": "1",
+                    "replaceSpChars": "0",
+                    "startPosition": start_position,
+                    "limit": limit
+                }
 
-            # Decode the response content and split into lines
-            content = response.content.decode("utf-8").splitlines()
+                # Make a GET request to the API
+                response = requests.get(api_url, params=params)
+                response.raise_for_status()
 
-            # If content is empty, break the loop
-            if not content:
-                break
+                # Decode the response content and split into lines
+                content = response.content.decode("utf-8").splitlines()
 
-            # Append the data to the combined data list
-            combined_data.extend(content)
+                # If content is empty, break the loop
+                if not content:
+                    break
 
-            # Count fetched records
-            fetched_records = len(content)
-            total_records_fetched += fetched_records
+                # Write the fetched data to the CSV file
+                csv_file.write("\n".join(content) + "\n")
 
-            # Send progress update to the frontend
-            socketio.emit("progress", {"records_fetched": total_records_fetched})
+                # Count fetched records
+                fetched_records = len(content)
+                total_records_fetched += fetched_records
 
-            # Check if fewer records than the limit were returned
-            if fetched_records < limit:
-                break
+                print(f"Fetched {total_records_fetched} records so far.")
 
-            # Update startPosition for the next batch
-            start_position += limit
+                # Check if fewer records than the limit were returned
+                if fetched_records < limit:
+                    break
 
-        # Convert the combined data to a DataFrame
-        csv_data = "\n".join(combined_data)
-        df = pd.read_csv(io.StringIO(csv_data))
+                # Update startPosition for the next batch
+                start_position += limit
 
-        # Save to Excel
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        print(f"All data saved to {output_csv_file}")
+        output_xlsx_file = io.BytesIO()  # Use BytesIO to avoid storing large files in memory
+
+        df = pd.read_csv(output_csv_file, low_memory=False)  # Read the saved CSV in chunks
+        with pd.ExcelWriter(output_xlsx_file, engine="xlsxwriter") as writer:
             df.to_excel(writer, index=False, sheet_name="Data")
 
-        output.seek(0)
+        output_xlsx_file.seek(0)
+
+        # Clean up temporary CSV file
+        os.remove(output_csv_file)
+
         return send_file(
-            output,
+            output_xlsx_file,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             as_attachment=True,
             download_name=f"{stats_data_id}.xlsx"
         )
 
     except requests.exceptions.RequestException as e:
-        socketio.emit("error", {"message": str(e)})
         return jsonify({"error": f"API request failed: {e}"}), 500
 
     except Exception as e:
-        socketio.emit("error", {"message": str(e)})
         return jsonify({"error": str(e)}), 500
-
 
 def convert_excel_to_hyper(excel_file, hyper_file, table_name="Extract"):
     try:
