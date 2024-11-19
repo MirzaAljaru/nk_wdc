@@ -93,7 +93,7 @@
         <!-- API to XLSX -->
         <div class="menu-item">
             <h2>API to XLSX</h2>
-            <form action="/get_xlsx"    method="POST" onsubmit="showLoadingPopup()>
+            <form action="/get_xlsx" method="POST" onsubmit="showLoadingPopup()">
                 <label for="api_url">API URL:</label>
                 <input type="text" id="api_url" name="api_url" placeholder="Enter API URL" required>
                 <label for="app_id">Application ID:</label>
@@ -135,10 +135,26 @@
         <div class="message">Processing... This may take a while.</div>
     </div>
 
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <script>
+        const socket = io();
+
         function showLoadingPopup() {
             // Show the loading popup when the form is submitted
-            document.getElementById("loading-popup").style.display = "flex";
+            const popup = document.getElementById("loading-popup");
+            const message = document.querySelector(".loading-popup .message");
+            popup.style.display = "flex";
+            message.textContent = "Processing... This may take a while.";
+
+            // Listen for progress updates from the server
+            socket.on("progress", (data) => {
+                message.textContent = `Processing... ${data.records_fetched} records fetched so far.`;
+            });
+
+            // Listen for errors
+            socket.on("error", (data) => {
+                message.textContent = `Error: ${data.message}`;
+            });
         }
     </script>
 </body>

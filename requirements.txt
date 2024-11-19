@@ -5,3 +5,4 @@ tableauhyperapi
 tableauserverclient
 xlsxwriter
 openpyxl
+flask-socketio

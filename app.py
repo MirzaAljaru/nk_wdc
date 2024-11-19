@@ -4,11 +4,13 @@ import pandas as pd
 import io
 import os
 from pathlib import Path
+from flask_socketio import SocketIO, emit
 from tableauhyperapi import HyperProcess, Connection, Telemetry, TableDefinition, SqlType, Inserter, TableName, CreateMode
 from tableauserverclient import TableauAuth, Server, Pager, DatasourceItem
 
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 UPLOAD_FOLDER = "uploads"
 HYPER_FOLDER = "hyper_files"
@@ -30,6 +32,8 @@ def add_csp_headers(response):
 def home():
     return render_template("index.html")
 
+
+
 @app.route("/get_xlsx", methods=["POST"])
 def get_xlsx():
     try:
@@ -43,36 +47,70 @@ def get_xlsx():
         # Replace appId in the URL if needed
         if "appId=" in api_url:
             api_url = api_url.replace("appId=", f"appId={app_id}")
-        
+
         # Extract statsDataId for naming the output file
         try:
             stats_data_id = api_url.split("statsDataId=")[1].split("&")[0]
         except IndexError:
             stats_data_id = "processed_data"
 
-        # Request headers
-        headers = {
-            "Application-Id": app_id
-        }
+        # Initialize pagination variables
+        start_position = 1
+        limit = 10000
+        total_records_fetched = 0
+        combined_data = []
 
-        # Make a GET request to the API
-        response = requests.get(api_url, headers=headers)
-        if response.status_code != 200:
-            return jsonify({"error": f"API request failed with status code {response.status_code}"}), 500
+        while True:
+            # Update the API URL with pagination parameters
+            params = {
+                "appId": app_id,
+                "lang": "E",
+                "statsDataId": stats_data_id,
+                "metaGetFlg": "Y",
+                "cntGetFlg": "N",
+                "explanationGetFlg": "Y",
+                "annotationGetFlg": "Y",
+                "sectionHeaderFlg": "1",
+                "replaceSpChars": "0",
+                "startPosition": start_position,
+                "limit": limit
+            }
 
-        # Decode the response content and split into lines
-        content = response.content.decode("utf-8").splitlines()
+            # Make a GET request to the API
+            response = requests.get(api_url, params=params)
+            response.raise_for_status()
 
-        # Use line 29 (index 28) as the header row
-        data_start_index = 28
+            # Decode the response content and split into lines
+            content = response.content.decode("utf-8").splitlines()
 
-        # Convert tabular data to DataFrame
-        csv_data = "\n".join(content[data_start_index:])
+            # If content is empty, break the loop
+            if not content:
+                break
+
+            # Append the data to the combined data list
+            combined_data.extend(content)
+
+            # Count fetched records
+            fetched_records = len(content)
+            total_records_fetched += fetched_records
+
+            # Send progress update to the frontend
+            socketio.emit("progress", {"records_fetched": total_records_fetched})
+
+            # Check if fewer records than the limit were returned
+            if fetched_records < limit:
+                break
+
+            # Update startPosition for the next batch
+            start_position += limit
+
+        # Convert the combined data to a DataFrame
+        csv_data = "\n".join(combined_data)
         df = pd.read_csv(io.StringIO(csv_data))
 
         # Save to Excel
         output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
             df.to_excel(writer, index=False, sheet_name="Data")
 
         output.seek(0)
@@ -83,7 +121,12 @@ def get_xlsx():
             download_name=f"{stats_data_id}.xlsx"
         )
 
+    except requests.exceptions.RequestException as e:
+        socketio.emit("error", {"message": str(e)})
+        return jsonify({"error": f"API request failed: {e}"}), 500
+
     except Exception as e:
+        socketio.emit("error", {"message": str(e)})
         return jsonify({"error": str(e)}), 500
 
 
