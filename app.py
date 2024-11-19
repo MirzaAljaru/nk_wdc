@@ -156,14 +156,70 @@ def convert_excel_to_hyper(excel_file, hyper_file, table_name="Extract"):
 
 
 
-def publish_hyper_to_tableau(tableau_server, username, password, project_name, hyper_file):
+# def publish_hyper_to_tableau(tableau_server, username, password, project_name, hyper_file):
+#     if not os.path.exists(hyper_file):
+#         raise FileNotFoundError(f"Hyper file does not exist at {hyper_file}")
+
+#     tableau_auth = TableauAuth(username, password)
+#     server = Server(tableau_server, use_server_version=True)
+#     try:
+#         with server.auth.sign_in(tableau_auth):
+#             # Find the project by name
+#             project = next((proj for proj in Pager(server.projects) if proj.name == project_name), None)
+#             if not project:
+#                 raise ValueError(f"Project '{project_name}' not found on Tableau Server")
+
+#             # Publish the Hyper file as a data source
+#             datasource = DatasourceItem(project_id=project.id)
+#             datasource = server.datasources.publish(datasource, hyper_file, mode="Overwrite")
+#             print(f"Published {hyper_file} to Tableau in project '{project_name}'")
+#     except Exception as e:
+#         raise Exception(f"Failed to publish to Tableau: {e}")
+
+
+# @app.route("/xlsx_to_tableau", methods=["POST"])
+# def xlsx_to_tableau():
+#     try:
+#         uploaded_file = request.files.get("xlsx_file")
+#         tableau_server = request.form.get("tableau_server_url")
+#         username = request.form.get("tableau_username")
+#         password = request.form.get("tableau_password")
+#         project_name = request.form.get("tableau_project_name")
+
+#         if not uploaded_file or not tableau_server or not username or not password or not project_name:
+#             return jsonify({"error": "Missing required parameters"}), 400
+
+#         excel_file_path = os.path.join(UPLOAD_FOLDER, uploaded_file.filename)
+#         uploaded_file.save(excel_file_path)
+
+#         hyper_file_path = os.path.join(HYPER_FOLDER, Path(uploaded_file.filename).stem + ".hyper")
+#         print(f"Excel file saved to: {excel_file_path}")
+#         print(f"Hyper file path: {hyper_file_path}")
+
+#         if not convert_excel_to_hyper(excel_file_path, hyper_file_path):
+#             return jsonify({"error": "Failed to convert Excel to Hyper file"}), 500
+
+#         # Publish to Tableau with all required arguments
+#         publish_hyper_to_tableau(tableau_server, username, password, project_name, hyper_file_path)
+#         return jsonify({"message": f"Successfully published {hyper_file_path} to Tableau"}), 200
+#     except Exception as e:
+#         print(f"Error: {e}")
+#         import traceback
+#         traceback.print_exc()
+#         return jsonify({"error": str(e)}), 500
+
+def publish_hyper_to_tableau(tableau_server, username, password, site_id, project_name, hyper_file):
     if not os.path.exists(hyper_file):
         raise FileNotFoundError(f"Hyper file does not exist at {hyper_file}")
 
-    tableau_auth = TableauAuth(username, password)
+    # Include the site_id in TableauAuth
+    tableau_auth = TableauAuth(username, password, site_id)
     server = Server(tableau_server, use_server_version=True)
+    
     try:
         with server.auth.sign_in(tableau_auth):
+            print(f"Signed in to Tableau Server: {tableau_server}")
+
             # Find the project by name
             project = next((proj for proj in Pager(server.projects) if proj.name == project_name), None)
             if not project:
@@ -184,9 +240,10 @@ def xlsx_to_tableau():
         tableau_server = request.form.get("tableau_server_url")
         username = request.form.get("tableau_username")
         password = request.form.get("tableau_password")
+        site_id = request.form.get("tableau_site_id")  # Add site_id field
         project_name = request.form.get("tableau_project_name")
 
-        if not uploaded_file or not tableau_server or not username or not password or not project_name:
+        if not uploaded_file or not tableau_server or not username or not password or not project_name or not site_id:
             return jsonify({"error": "Missing required parameters"}), 400
 
         excel_file_path = os.path.join(UPLOAD_FOLDER, uploaded_file.filename)
@@ -200,13 +257,14 @@ def xlsx_to_tableau():
             return jsonify({"error": "Failed to convert Excel to Hyper file"}), 500
 
         # Publish to Tableau with all required arguments
-        publish_hyper_to_tableau(tableau_server, username, password, project_name, hyper_file_path)
+        publish_hyper_to_tableau(tableau_server, username, password, site_id, project_name, hyper_file_path)
         return jsonify({"message": f"Successfully published {hyper_file_path} to Tableau"}), 200
     except Exception as e:
         print(f"Error: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
 
 
 if __name__ == "__main__":
