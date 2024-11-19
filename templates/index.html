@@ -47,6 +47,44 @@
         button:hover {
             background-color: #0056b3;
         }
+
+        /* Loading popup styles */
+        .loading-popup {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .loading-popup .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #007BFF;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-popup .message {
+            margin-top: 20px;
+            color: white;
+            font-size: 18px;
+        }
     </style>
 </head>
 <body>
@@ -55,7 +93,7 @@
         <!-- API to XLSX -->
         <div class="menu-item">
             <h2>API to XLSX</h2>
-            <form action="/get_xlsx" method="POST">
+            <form action="/get_xlsx"    method="POST" onsubmit="showLoadingPopup()>
                 <label for="api_url">API URL:</label>
                 <input type="text" id="api_url" name="api_url" placeholder="Enter API URL" required>
                 <label for="app_id">Application ID:</label>
@@ -67,7 +105,7 @@
         <!-- XLSX to Tableau -->
         <div class="menu-item">
             <h2>XLSX to Tableau</h2>
-            <form action="/xlsx_to_tableau" method="POST" enctype="multipart/form-data">
+            <form action="/xlsx_to_tableau" method="POST" enctype="multipart/form-data" onsubmit="showLoadingPopup()">
                 <label for="xlsx_file">Upload XLSX File:</label>
                 <input type="file" id="xlsx_file" name="xlsx_file" accept=".xlsx" required>
 
@@ -87,5 +125,18 @@
             </form>
         </div>
     </div>
+
+    <!-- Loading popup -->
+    <div class="loading-popup" id="loading-popup">
+        <div class="spinner"></div>
+        <div class="message">Processing... This may take a while.</div>
+    </div>
+
+    <script>
+        function showLoadingPopup() {
+            // Show the loading popup when the form is submitted
+            document.getElementById("loading-popup").style.display = "flex";
+        }
+    </script>
 </body>
 </html>
